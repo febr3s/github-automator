@@ -1,8 +1,16 @@
 // auth.js
+import dotenv from 'dotenv';
+dotenv.config(); // Load variables from .env into process.env
+
+
 import { Octokit } from "@octokit/rest";
 import { createOAuthDeviceAuth } from "@octokit/auth-oauth-device";
 
-const CLIENT_ID = "Ov23liosvf6mN81olleQ"; // Replace with your actual Client ID
+const CLIENT_ID = process.env.GITHUB_CLIENT_ID;
+
+if (!CLIENT_ID) {
+  throw new Error("GITHUB_CLIENT_ID is not set. Please create a .env file based on .env.example.");
+}
 
 export async function getAuthenticatedOctokit() {
   const auth = createOAuthDeviceAuth({
