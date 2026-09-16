@@ -1,0 +1,16 @@
+{
+  "name": "github-automator",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@octokit/auth-oauth-device": "^8.0.5",
+    "@octokit/rest": "^22.0.1"
+  }
+}
