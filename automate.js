@@ -72,17 +72,6 @@ async function main() {
   const { forkOwner, forkRepo } = await getOrCreateFork(octokit);
   console.log(`Ready to work with ${forkOwner}/${forkRepo}`);
 
-  // --- File edits ---
-  console.log("Updating config.yml...");
-  const newConfigContent = "version: 2\n# ... your new config data ...";
-  await updateFile(octokit, forkOwner, forkRepo, "config.yml",
-    newConfigContent, "Update config.yml via API");
-
-  // Uncomment and set the real CSV path when ready:
-  // console.log("Updating data.csv...");
-  // await updateFile(octokit, forkOwner, forkRepo, "data.csv",
-  //   "id,name,value\n1,new_entry,100\n2,another,200", "Update data.csv via API");
-
   // --- Repo-level Actions permission ---
   console.log("Enabling GitHub Actions at repo level...");
   await octokit.rest.actions.setGithubActionsPermissionsRepository({
@@ -115,6 +104,18 @@ async function main() {
       throw error;
     }
   }
+
+// --- Content edit ---
+  console.log("Updating config.yml...");
+  const newConfigContent = "version: 2\n# ... your new config data ...";
+  await updateFile(octokit, forkOwner, forkRepo, "config.yml",
+    newConfigContent, "Update config.yml via API");
+
+  // Uncomment and set the real CSV path when ready:
+  // console.log("Updating data.csv...");
+  // await updateFile(octokit, forkOwner, forkRepo, "data.csv",
+  //   "id,name,value\n1,new_entry,100\n2,another,200", "Update data.csv via API");
+
 }
 
 main().catch(err => {
