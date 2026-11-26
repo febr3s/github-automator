@@ -4,6 +4,8 @@ import { getAuthenticatedOctokit } from './auth.js';
 const ORIGINAL_OWNER = "morelrep";
 const ORIGINAL_REPO = "morel-no-code-generator-dev";
 
+// --- Helpers ---
+
 async function updateFile(octokit, owner, repo, path, newContent, commitMessage) {
   let currentFileSha = undefined;
   try {
@@ -20,6 +22,25 @@ async function updateFile(octokit, owner, repo, path, newContent, commitMessage)
     ...(currentFileSha && { sha: currentFileSha }),
   });
   console.log(`✅ Updated ${path}`);
+}
+
+async function patchFile(octokit, owner, repo, path, transformFn, commitMessage) {
+  const { data: current } = await octokit.rest.repos.getContent({ owner, repo, path });
+  if (Array.isArray(current)) throw new Error(`${path} is a directory, not a file`);
+
+  const oldText = Buffer.from(current.content, "base64").toString("utf8");
+  const newText = transformFn(oldText);
+  if (newText === oldText) {
+    console.log(`  ↪️ No change to ${path} (transform produced identical content).`);
+    return;
+  }
+
+  await octokit.rest.repos.createOrUpdateFileContents({
+    owner, repo, path, message: commitMessage,
+    content: Buffer.from(newText, "utf8").toString("base64"),
+    sha: current.sha,
+  });
+  console.log(`✅ Patched ${path}`);
 }
 
 async function getOrCreateFork(octokit) {
@@ -67,6 +88,19 @@ async function enableAllWorkflows(octokit, owner, repo) {
     : "  No disabled workflows found.");
 }
 
+// --- Small YAML-ish helper for the transform ---
+function setYamlKey(text, key, value) {
+  const re = new RegExp(`^${key}:.*$`, "m");
+  if (re.test(text)) {
+    return text.replace(re, `${key}: ${value}`);
+  }
+  // Key not present — append it on a new line.
+  const withNewline = text.endsWith("\n") ? text : text + "\n";
+  return `${withNewline}${key}: ${value}\n`;
+}
+
+// --- Main ---
+
 async function main() {
   const octokit = await getAuthenticatedOctokit();
   const { forkOwner, forkRepo } = await getOrCreateFork(octokit);
@@ -88,7 +122,7 @@ async function main() {
     await octokit.rest.repos.updateInformationAboutPagesSite({
       owner: forkOwner,
       repo: forkRepo,
-      build_type: "workflow", // "workflow" = deploy via Actions
+      build_type: "workflow",
     });
     console.log("✅ GitHub Pages configured to deploy via GitHub Actions.");
   } catch (error) {
@@ -105,17 +139,24 @@ async function main() {
     }
   }
 
-// --- Content edit ---
-  console.log("Updating config.yml...");
-  const newConfigContent = "version: 2\n# ... your new config data ...";
-  await updateFile(octokit, forkOwner, forkRepo, "config.yml",
-    newConfigContent, "Update config.yml via API");
+  // --- Content edit (read-modify-write) ---
+  console.log("Patching _config.yml...");
+  const CONFIG_PATH = "_config.yml"; // verify this — see note below
+  await patchFile(octokit, forkOwner, forkRepo, CONFIG_PATH,
+    (text) => {
+      // Example: set 'baseurl' to the fork's repo name (typical for Jekyll project sites).
+      let out = setYamlKey(text, "BASE_PATH", `"/${forkRepo}"`);
+      // Add more setYamlKey calls here as you learn which fields matter:
+      // out = setYamlKey(out, "title", `"My Site"`);
+      return out;
+    },
+    "Update _config.yml via API"
+  );
 
-  // Uncomment and set the real CSV path when ready:
-  // console.log("Updating data.csv...");
+  // CSV edit, when ready:
+  // console.log("Patching data.csv...");
   // await updateFile(octokit, forkOwner, forkRepo, "data.csv",
   //   "id,name,value\n1,new_entry,100\n2,another,200", "Update data.csv via API");
-
 }
 
 main().catch(err => {
