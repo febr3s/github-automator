@@ -1,10 +1,21 @@
 // automate.js
 import { getAuthenticatedOctokit } from './auth.js';
-
+import fs from "node:fs/promises";
 const ORIGINAL_OWNER = "morelrep";
 const ORIGINAL_REPO = "morel-no-code-generator-dev";
 
 // --- Helpers ---
+async function loadSiteConfig() {
+  try {
+    const raw = await fs.readFile("site-config.json", "utf8");
+    return JSON.parse(raw);
+  } catch (error) {
+    if (error.code === "ENOENT") {
+      throw new Error("site-config.json not found. Run `node form.js` first to collect site variables.");
+    }
+    throw error;
+  }
+}
 
 async function updateFile(octokit, owner, repo, path, newContent, commitMessage) {
   let currentFileSha = undefined;
@@ -102,6 +113,7 @@ function setYamlKey(text, key, value) {
 // --- Main ---
 
 async function main() {
+  const siteConfig = await loadSiteConfig();
   const octokit = await getAuthenticatedOctokit();
   const { forkOwner, forkRepo } = await getOrCreateFork(octokit);
   console.log(`Ready to work with ${forkOwner}/${forkRepo}`);
@@ -142,16 +154,20 @@ async function main() {
   // --- Content edit (read-modify-write) ---
   console.log("Patching _config.yml...");
   const CONFIG_PATH = "_config.yml"; // verify this — see note below
-  await patchFile(octokit, forkOwner, forkRepo, CONFIG_PATH,
-    (text) => {
-      // Example: set 'baseurl' to the fork's repo name (typical for Jekyll project sites).
-      let out = setYamlKey(text, "BASE_PATH", `"/${forkRepo}"`);
-      // Add more setYamlKey calls here as you learn which fields matter:
-      // out = setYamlKey(out, "title", `"My Site"`);
-      return out;
-    },
-    "Update _config.yml via API"
-  );
+  await patchFile(octokit, forkOwner, forkRepo, "_config.yml",
+  (text) => {
+    let out = text;
+    for (const [key, value] of Object.entries(siteConfig)) {
+      const rendered = /^[a-zA-Z0-9_\-\/\.]+$/.test(value) && !value.startsWith("/")
+        ? value
+        : `"${value.replace(/"/g, '\\"')}"`;
+      out = setYamlKey(out, key, rendered);
+    }
+    out = setYamlKey(out, "baseurl", `"/${forkRepo}"`);
+    return out;
+  },
+  "Update _config.yml from site-config.json"
+);
 
   // CSV edit, when ready:
   // console.log("Patching data.csv...");
