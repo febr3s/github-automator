@@ -93,13 +93,28 @@ async function main() {
   // --- Per-workflow enablement (clears the "fork gate") ---
   await enableAllWorkflows(octokit, forkOwner, forkRepo);
 
-  // --- Pages (uncomment once you confirm the default branch) ---
-  // console.log("Enabling GitHub Pages...");
-  // await octokit.rest.repos.createPagesSite({
-  //   owner: forkOwner, repo: forkRepo,
-  //   source: { branch: "main", path: "/" },
-  // });
-  // console.log("✅ GitHub Pages enabled.");
+  // --- Configure GitHub Pages to deploy via GitHub Actions ---
+  console.log("Configuring GitHub Pages (source: GitHub Actions)...");
+  try {
+    await octokit.rest.repos.updateInformationAboutPagesSite({
+      owner: forkOwner,
+      repo: forkRepo,
+      build_type: "workflow", // "workflow" = deploy via Actions
+    });
+    console.log("✅ GitHub Pages configured to deploy via GitHub Actions.");
+  } catch (error) {
+    if (error.status === 404) {
+      console.log("Pages not yet enabled. Creating site with Actions source...");
+      await octokit.rest.repos.createPagesSite({
+        owner: forkOwner,
+        repo: forkRepo,
+        build_type: "workflow",
+      });
+      console.log("✅ GitHub Pages site created with Actions source.");
+    } else {
+      throw error;
+    }
+  }
 }
 
 main().catch(err => {
