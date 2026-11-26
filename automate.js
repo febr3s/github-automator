@@ -1,8 +1,8 @@
 // automate.js
 import { getAuthenticatedOctokit } from './auth.js';
 
-const ORIGINAL_OWNER = "RivoLink";
-const ORIGINAL_REPO = "leaf";
+const ORIGINAL_OWNER = "morelrep";
+const ORIGINAL_REPO = "morel-no-code-generator-dev";
 
 async function updateFile(octokit, owner, repo, path, newContent, commitMessage) {
   let currentFileSha = undefined;
